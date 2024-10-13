@@ -1,0 +1,104 @@
+blueprint:
+  name: Sprachbefehl zum Auslesen von Entitäten mit erweiterten Optionen
+  description: Automatisierung, die auf einen Sprachbefehl mit Erkennungswörtern reagiert, eine Entität ausliest und Benachrichtigungen sendet
+  domain: automation
+  input:
+    voice_command_template:
+      name: Sprachbefehl Template
+      description: Der Text für den Sprachbefehl mit einem Platzhalter für die Entität, z.B. "Wie teuer ist Diesel bei {entity}?"
+      default: "Wie teuer ist Diesel bei {entity}?"
+      selector:
+        text:
+    notify_entity:
+      name: Notify Entity
+      description: Wähle das Gerät aus, an das die Benachrichtigung gesendet werden soll
+      selector:
+        entity:
+          domain: notify
+    notify_priority:
+      name: Benachrichtigungspriorität
+      description: Wähle die Benachrichtigungspriorität für iOS Geräte
+      selector:
+        select:
+          options:
+            - normal
+            - critical
+            - time_sensitive
+    notification_volume:
+      name: Benachrichtigungslautstärke
+      description: Wähle die Lautstärke der Benachrichtigung (0-1)
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.1
+          mode: slider
+    action1:
+      name: Erste Aktion
+      description: Erste individuelle Aktion
+      selector:
+        action:
+    timer1:
+      name: Timer für erste Aktion
+      description: Zeitverzögerung für die erste Aktion (Stunden/Minuten/Sekunden)
+      selector:
+        duration:
+    action2:
+      name: Zweite Aktion
+      description: Zweite individuelle Aktion
+      selector:
+        action:
+    timer2:
+      name: Timer für zweite Aktion
+      description: Zeitverzögerung für die zweite Aktion (Stunden/Minuten/Sekunden)
+      selector:
+        duration:
+    action3:
+      name: Dritte Aktion
+      description: Dritte individuelle Aktion
+      selector:
+        action:
+    timer3:
+      name: Timer für dritte Aktion
+      description: Zeitverzögerung für die dritte Aktion (Stunden/Minuten/Sekunden)
+      selector:
+        duration:
+
+trigger:
+  - platform: event
+    event_type: voice_command
+    event_data:
+      command: !input voice_command_template
+
+variables:
+  entity_id: >
+    {{ trigger.event.data.command
+       | regex_search('bei|von|Sensor|Schalter|Entity|Zustand')
+       | regex_replace('.*(bei|von|Sensor|Schalter|Entity|Zustand)', '')
+       | trim }}
+
+action:
+  - service: !input notify_entity
+    data:
+      title: "Abgefragte Information"
+      message: "Wert der Entität {{ states[entity_id].name }}: {{ states[entity_id].state }}"
+      data:
+        push:
+          sound: |
+            {
+              "critical": {{ 'true' if !input notify_priority == 'critical' else 'false' }},
+              "volume": {{ !input notification_volume }},
+              "interruption-level": "{{ !input notify_priority }}"
+            }
+  - delay: "{{ !input timer1 }}"
+  - choose:
+      - conditions: "{{ !input action1 is defined }}"
+        sequence: !input action1
+  - delay: "{{ !input timer2 }}"
+  - choose:
+      - conditions: "{{ !input action2 is defined }}"
+        sequence: !input action2
+  - delay: "{{ !input timer3 }}"
+  - choose:
+      - conditions: "{{ !input action3 is defined }}"
+        sequence: !input action3
